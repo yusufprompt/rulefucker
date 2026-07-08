@@ -1,11 +1,12 @@
 #!/bin/bash
-RED='\033[0;31m'
-WHITE='\033[0;37m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+RED='\033;31m'
+WHITE='\033;37m'
+GREEN='\033;32m'
+CYAN='\033;36m'
+YELLOW='\033;1;33m'
+NC='\033;0m'
 
+# Kök kullanıcı (root) kontrolü
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Hata: Rulefucker God Mode sistemin kalbine müdahale eder. Lütfen 'sudo ./rulefucker.sh' şeklinde çalıştırın.${NC}"
   exit 1
@@ -14,17 +15,51 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_CLI="$SCRIPT_DIR/native_manager.py"
 
-# python3 bulunuyor mu kontrol et
-if ! command -v python3 &>/dev/null; then
-    echo -e "${RED}Hata: python3 sistemde bulunamadı. Lütfen kurun (örn: apt install python3).${NC}"
-    exit 1
-fi
-
 # native_manager.py dosyası var mı kontrol et
 if [ ! -f "$PYTHON_CLI" ]; then
     echo -e "${RED}Hata: $PYTHON_CLI bulunamadı. Script'in yanında olduğundan emin olun.${NC}"
     exit 1
 fi
+
+# Otomatik Paket Yükleme Fonksiyonu (Dağıtım Bağımsız)
+install_package() {
+    local pkg=$1
+    echo -e "${YELLOW}[+] $pkg paket yöneticisi üzerinden kuruluyor...${NC}"
+    
+    if command -v apt-get &>/dev/null; then
+        apt-get update -y && apt-get install -y "$pkg"
+    elif command -v pacman &>/dev/null; then
+        pacman -Sy --noconfirm "$pkg"
+    elif command -v dnf &>/dev/null; then
+        dnf install -y "$pkg"
+    else
+        echo -e "${RED}Hata: Uygun bir paket yöneticisi (apt, pacman, dnf) bulunamadı. Lütfen $pkg paketini manuel kurun.${NC}"
+        exit 1
+    fi
+}
+
+echo -e "${CYAN}[*] Sistem gereksinimleri kontrol ediliyor...${NC}"
+
+# python3 kontrolü ve otomatik kurulumu
+if ! command -v python3 &>/dev/null; then
+    echo -e "${YELLOW}[!] python3 sistemde bulunamadı.${NC}"
+    install_package "python3"
+fi
+
+# zsh kontrolü ve otomatik kurulumu
+if ! command -v zsh &>/dev/null; then
+    echo -e "${YELLOW}[!] zsh sistemde bulunamadı.${NC}"
+    install_package "zsh"
+fi
+
+# git kontrolü ve otomatik kurulumu (Git Install menüsü için gerekli)
+if ! command -v git &>/dev/null; then
+    echo -e "${YELLOW}[!] git sistemde bulunamadı.${NC}"
+    install_package "git"
+fi
+
+echo -e "${GREEN}[✓] Tüm bağımlılıklar hazır!${NC}"
+sleep 1
 
 run_python() {
     # Doğrudan çalıştırma izni yerine her zaman python3 ile çağır (izin sorunlarını önler)
