@@ -1,10 +1,10 @@
 #!/bin/bash
-RED='\033;31m'
-WHITE='\033;37m'
-GREEN='\033;32m'
-CYAN='\033;36m'
-YELLOW='\033;1;33m'
-NC='\033;0m'
+RED='\033[0;31m'
+WHITE='\033[0;37m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
 # Kök kullanıcı (root) kontrolü
 if [ "$EUID" -ne 0 ]; then
@@ -21,7 +21,7 @@ if [ ! -f "$PYTHON_CLI" ]; then
     exit 1
 fi
 
-# Otomatik Paket Yükleme Fonksiyonu (Dağıtım Bağımsız)
+# Evrensel Paket Yükleme Fonksiyonu
 install_package() {
     local pkg=$1
     echo -e "${YELLOW}[+] $pkg paket yöneticisi üzerinden kuruluyor...${NC}"
@@ -33,36 +33,48 @@ install_package() {
     elif command -v dnf &>/dev/null; then
         dnf install -y "$pkg"
     else
-        echo -e "${RED}Hata: Uygun bir paket yöneticisi (apt, pacman, dnf) bulunamadı. Lütfen $pkg paketini manuel kurun.${NC}"
+        echo -e "${RED}Hata: Uygun bir paket yöneticisi bulunamadı. Lütfen $pkg paketini manuel kurun.${NC}"
         exit 1
     fi
 }
 
 echo -e "${CYAN}[*] Sistem gereksinimleri kontrol ediliyor...${NC}"
 
-# python3 kontrolü ve otomatik kurulumu
-if ! command -v python3 &>/dev/null; then
-    echo -e "${YELLOW}[!] python3 sistemde bulunamadı.${NC}"
-    install_package "python3"
+# Temel araçların kontrolü
+for cmd in python3 git make gcc; do
+    if ! command -v $cmd &>/dev/null; then
+        echo -e "${YELLOW}[!] $cmd sistemde bulunamadı.${NC}"
+        install_package "$cmd"
+    fi
+done
+
+# --- OTOMATİK KERNEL HEADERS KONTROLÜ VE KURULUMU ---
+if [ ! -d "/lib/modules/$(uname -r)/build" ]; then
+    echo -e "${YELLOW}[!] Kernel başlık dosyaları (headers) eksik. Dağıtıma uygun paket otomatik kuruluyor...${NC}"
+    
+    if command -v pacman &>/dev/null; then
+        pacman -Sy --noconfirm linux-headers
+    elif command -v apt-get &>/dev/null; then
+        apt-get update -y && apt-get install -y linux-headers-$(uname -r)
+    elif command -v dnf &>/dev/null; then
+        dnf install -y kernel-devel
+    else
+        echo -e "${RED}Hata: Headers paketi otomatik kurulamadı. Lütfen manuel yükleyin.${NC}"
+        exit 1
+    fi
+
+    # Arch Linux için senkronizasyon uyarısı
+    if [ ! -d "/lib/modules/$(uname -r)/build" ] && command -v pacman &>/dev/null; then
+        echo -e "${RED}[!] Dikkat Yustea Bey: Kernel güncellenmiş fakat sistem yeniden başlatılmamış!${NC}"
+        echo -e "${YELLOW}Modül derlemek için lütfen sistemi yeniden başlatın (sudo reboot).${NC}"
+        read -p "Devam etmek için Enter'a basın (Derleme hata verebilir)..."
+    fi
 fi
 
-# zsh kontrolü ve otomatik kurulumu
-if ! command -v zsh &>/dev/null; then
-    echo -e "${YELLOW}[!] zsh sistemde bulunamadı.${NC}"
-    install_package "zsh"
-fi
-
-# git kontrolü ve otomatik kurulumu (Git Install menüsü için gerekli)
-if ! command -v git &>/dev/null; then
-    echo -e "${YELLOW}[!] git sistemde bulunamadı.${NC}"
-    install_package "git"
-fi
-
-echo -e "${GREEN}[✓] Tüm bağımlılıklar hazır!${NC}"
+echo -e "${GREEN}[✓] Tüm bağımlılıklar ve derleme ortamı hazır!${NC}"
 sleep 1
 
 run_python() {
-    # Doğrudan çalıştırma izni yerine her zaman python3 ile çağır (izin sorunlarını önler)
     python3 "$PYTHON_CLI" "$@"
     local status=$?
     if [ $status -ne 0 ]; then
@@ -87,7 +99,7 @@ show_menu() {
     echo "4) Git Install (Herhangi bir Repoyu Otomatik Derle ve Kur)"
     echo "5) Bootloader & Init Manipülasyonu (GRUB Parametresi Ekle)"
     echo "6) MAC Adresi Değiştirme (Ağ Gizliliği)"
-    echo "7) Varsayılan Kabuğu (Shell) Değiştirme"
+    echo "7) Varsayılan Kabuğu (Shell) Değiştirme (Zsh Kontrollü)"
     echo "8) Çıkış"
     echo -e "${CYAN}======================================================${NC}"
 }
@@ -133,6 +145,11 @@ while true; do
             ;;
         7)
             echo -e "\n${CYAN}[ Kabuk (Shell) Değiştirme ]${NC}"
+            # Zsh yükleme kontrolü sadece bu menü seçildiğinde tetiklenir
+            if ! command -v zsh &>/dev/null; then
+                echo -e "${YELLOW}[!] zsh sistemde bulunamadı. Kabuk menüsü seçildiği için şimdi kuruluyor...${NC}"
+                install_package "zsh"
+            fi
             run_python "shell"
             read -p "Devam etmek için Enter'a basın..."
             ;;
