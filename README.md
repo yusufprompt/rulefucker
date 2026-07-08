@@ -25,7 +25,7 @@ Menüden yapabileceğiniz işlemler:
 ### 1. Kimlik ve Arayüz (Identity & UI)
 - **Uname Değiştirici:** Linux Çekirdeğine (Kernel) bir modül enjekte ederek hafızadaki kimliğini (Sysname, Release vb.) anında ve kalıcı ezer.
 - **OS Identity:** `/etc/os-release` dosyasını otomatik yedekler ve sisteminizi istediğiniz isimle yeniden yapılandırır.
-- **DE/WM Evrensel Kurucu:** Sisteminizi otomatik tarar (`apt`, `pacman`, `dnf` vb. hangisi kullanılıyorsa bulur) ve belirttiğiniz masaüstü ortamını (örn. Hyprland) anında kurar.
+- **DE/WM Evrensel Kurucu:** Sisteminizi otomatik tarar (`apt`, `pacman`, `dnf` vb. hangisi kullanılıyorsa bulur) ve belirttiğiniz masaüstü ortamını (örn. Hyprland) anında kurar (ek özellikleri isteğe bağlı kurar ve kurulumda sana bunları sorar).
 
 ### 2. God Mode Araçları
 - **Git Install (Otomatik Derleyici):** Sadece Github/Gitlab linkini verin. Araç depoyu klonlar, içindeki `Makefile`, `CMake`, `Cargo` veya `Autotools` altyapısını otomatik algılar, derler ve sisteme kurar.
