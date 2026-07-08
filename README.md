@@ -6,7 +6,7 @@
 Bu sürüm, sistemin bootloader (GRUB), init parametreleri, ağ (MAC adresi) ve çekirdek (Kernel) hafızası gibi en kritik ve tehlikeli bölgelerine müdahale etme yeteneğine sahiptir. Her zaman **root (`sudo`)** yetkisi ile çalıştırılmalıdır. Sorumluluk tamamen kullanıcıya aittir.
 
 ## 🛠️ Kurulum
-
+GCC ve Make gereklidir
 Herhangi bir manuel derlemeye gerek yoktur, araç bağımlılıkları kendisi yönetir.
 ```bash
 cd /path/to/rulefucker
