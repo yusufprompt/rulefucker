@@ -1,5 +1,4 @@
 #!/bin/bash
-
 RED='\033[0;31m'
 WHITE='\033[0;37m'
 GREEN='\033[0;32m'
@@ -12,7 +11,30 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-PYTHON_CLI="$(dirname "$0")/native_manager.py"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_CLI="$SCRIPT_DIR/native_manager.py"
+
+# python3 bulunuyor mu kontrol et
+if ! command -v python3 &>/dev/null; then
+    echo -e "${RED}Hata: python3 sistemde bulunamadı. Lütfen kurun (örn: apt install python3).${NC}"
+    exit 1
+fi
+
+# native_manager.py dosyası var mı kontrol et
+if [ ! -f "$PYTHON_CLI" ]; then
+    echo -e "${RED}Hata: $PYTHON_CLI bulunamadı. Script'in yanında olduğundan emin olun.${NC}"
+    exit 1
+fi
+
+run_python() {
+    # Doğrudan çalıştırma izni yerine her zaman python3 ile çağır (izin sorunlarını önler)
+    python3 "$PYTHON_CLI" "$@"
+    local status=$?
+    if [ $status -ne 0 ]; then
+        echo -e "${RED}Hata: Komut başarısız oldu (çıkış kodu: $status).${NC}"
+    fi
+    return $status
+}
 
 show_menu() {
     clear
@@ -38,42 +60,45 @@ show_menu() {
 while true; do
     show_menu
     read -p "Seçiminiz (1-8): " choice
-
     case $choice in
         1)
             echo -e "\n${CYAN}[ Uname Customization ]${NC}"
-            "$PYTHON_CLI" "uname"
+            run_python "uname"
             read -p "Devam etmek için Enter'a basın..."
             ;;
         2)
             echo -e "\n${CYAN}[ OS Identity Customization ]${NC}"
-            "$PYTHON_CLI" "os"
+            run_python "os"
             read -p "Devam etmek için Enter'a basın..."
             ;;
         3)
             echo -e "\n${CYAN}[ DE / WM Kurulumu ]${NC}"
             read -p "Kurulacak arayüzün adı (Örn: hyprland, xfce): " de_name
-            [ -n "$de_name" ] && "$PYTHON_CLI" "install" "$de_name"
+            if [ -n "$de_name" ]; then
+                run_python "install" "$de_name"
+            else
+                echo -e "${RED}Arayüz adı boş bırakılamaz.${NC}"
+            fi
             read -p "Devam etmek için Enter'a basın..."
             ;;
         4)
             echo -e "\n${CYAN}[ Git Install (Otomatik Derleyici) ]${NC}"
-            "$PYTHON_CLI" "git-install"
+            run_python "git-install"
             read -p "Devam etmek için Enter'a basın..."
             ;;
         5)
             echo -e "\n${CYAN}[ Bootloader & Init Manipülasyonu ]${NC}"
-            "$PYTHON_CLI" "boot"
+            run_python "boot"
             read -p "Devam etmek için Enter'a basın..."
             ;;
         6)
             echo -e "\n${CYAN}[ MAC Adresi Değiştirme ]${NC}"
-            "$PYTHON_CLI" "mac"
+            run_python "mac"
             read -p "Devam etmek için Enter'a basın..."
             ;;
         7)
             echo -e "\n${CYAN}[ Kabuk (Shell) Değiştirme ]${NC}"
-            "$PYTHON_CLI" "shell"
+            run_python "shell"
             read -p "Devam etmek için Enter'a basın..."
             ;;
         8)
