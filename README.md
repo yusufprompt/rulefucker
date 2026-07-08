@@ -34,5 +34,24 @@ Menüden yapabileceğiniz işlemler:
 - **Kabuk (Shell) Evrimi:** Sistemin varsayılan terminal kabuğunu (örn. `bash`'ten `zsh`'e) kalıcı olarak değiştirir.
 - **Ses Servisi Değişimi:** Sistemdeki  Kullanılan Ses Servisini (örnek pipewire) Servisini İstenilen Ses Servisi (örnek PulseAudio) Servisi olarak değiştirir.
 
+
+##  🔥 Aradığın Paketi Bulma 
+
+Aradığınız Bir Paket Var Fakat Bulamıyorsunuz Çok karmaşık şeyler le de uğraşmak **İstemiyorsunuz** İşte tam Burda Bu Script Size Yardım ediyor 
+İstediğin Paketi Arayın Biraz Bekleyin Ve **BOM!** İstediğiniz Paketi Buldunuz!
+
+### ❓ Nasıl Çalışıyor?
+Bu Script **if** mantığı ile çalışıyor:
+
+- **İşletim Sistemi Tespit Etme**: Kullandığınız İşletim Sistemini(Arch,Fedora,Ubuntu/Debian,NixOS vb.) Algılar.
+- **Yapay Zeka Destekli Sorgulama**:
+İstediğiniz Paketı Yazdığınızda Paketi **SwoxAI** ya İletir ve Cevap Bekler. SwoxAI Cevap Verdiğinde Cevabı Kullanıcıya İletir.
+- **Doğrulama**:
+Paketi Kullanıcıya sorar (Paket Bu mu?<y-n>) Kullanıcı Eyer **Y** derse Paketi İşletim Sistemine göre İndirir.
+Eyer N derse Paketi Bulana Kadar sorgular Kullanıcıya sorar AI ya iletir.
+- **NixOS Kullanıcıları İçin**
+Biliyorsunuzki Nix Kullanıcıları Paketleri Paket Yöneticisi İle indirmez Onun Yerine **configuration.nix** adlı dosyayi değiştirip **nixos-rebuild switch** İle Sistemi inşa edip O Paketi Kurar
+Peki Bu Script Nasıl indiriyor? Kullanıcı Onay verdiğinde EDITOR ile 
+'environment.systemPackages' Kısmının en Altına O Paketi **Ekler** ve Kaydet Ve çık Yapıp sudo nixos-rebuild switch Komutunu Çalıştırır 
 ---
 *İnsanların yükselişine bir basamak.*
