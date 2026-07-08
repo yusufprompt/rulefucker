@@ -1,53 +1,37 @@
-# 🚀 Rulefucker v3.0
+# 🚀 Rulefucker v4.0 - Ultimate System Mutator (God Mode)
 
-**Rulefucker**, Linux sisteminizin kimliğini (İşletim sistemi adı, Kernel bilgileri, Masaüstü ortamı vb.) **gerçekten** ve **kalıcı** olarak değiştiren (spoofing değil, mutasyon) güçlü bir sistem özelleştiricisidir. İnsanları kandırmaz, onların yükselişine basamak ekler!
+**Rulefucker**, Linux sisteminizin kimliğini ve temel yapıtaşlarını **gerçekten** ve **kalıcı** olarak değiştiren (spoofing değil, mutasyon) "Tanrı Modu" özelliklerine sahip güçlü bir sistem evrim aracıdır. İnsanları kandırmaz, onların yükselişine basamak ekler!
 
-LD_PRELOAD gibi geçici kancalar (hook) kullanmak yerine, doğrudan çekirdeğe (Kernel) modül yükleyerek hafızadaki bilgileri ezer ve sistemin her yerinde (başlangıç komut dosyalarından neofetch'e kadar) değişikliğin geçerli olmasını sağlar. Ayrıca distrolardan (Debian, Arch, Fedora) bağımsız olarak çalışır ve istediğiniz masaüstü ortamını kurabilir.
-
-## ⚠️ Uyarı
-Bu araç sistem dosyalarına (`/etc/os-release` vb.) doğrudan müdahale eder ve çekirdek modülü yükler. Her zaman **root (`sudo`)** yetkisi ile çalıştırılmalıdır. Sorumluluk kullanıcıya aittir.
+## ⚠️ Dikkat: Tanrı Modu
+Bu sürüm, sistemin bootloader (GRUB), init parametreleri, ağ (MAC adresi) ve çekirdek (Kernel) hafızası gibi en kritik ve tehlikeli bölgelerine müdahale etme yeteneğine sahiptir. Her zaman **root (`sudo`)** yetkisi ile çalıştırılmalıdır. Sorumluluk tamamen kullanıcıya aittir.
 
 ## 🛠️ Kurulum
-Bu araç bağımsız Python ve C dosyalarından oluşmaktadır. Herhangi bir derleme işlemine gerek yoktur, araç modülü kendisi derler (ancak sisteminizde `linux-headers` yüklü olmalıdır).
 
+Herhangi bir manuel derlemeye gerek yoktur, araç bağımlılıkları kendisi yönetir.
 ```bash
 cd /path/to/rulefucker
-chmod +x native_manager.py
-sudo ln -sf native_manager.py /usr/local/bin/rulefucker
+chmod +x native_manager.py rulefucker.sh
 ```
 
-## 📚 Kullanım (Komutlar)
+## 📚 Kullanım ve Özellikler
 
-Rulefucker komutlarını terminalden interaktif veya argüman vererek kullanabilirsiniz.
-
-### 1. Kernel (Uname) Değiştirme
-Kernelin kendini nasıl tanıttığını değiştirmek için:
+En kolay ve interaktif kullanım için hazırlanan ana menüyü başlatmanız yeterlidir:
 ```bash
-sudo ./rulefucker uname
-```
-*(Bu komut argümansız çalıştırıldığında size `Sysname ne olsun?`, `Nodename ne olsun?` gibi sorular sorarak interaktif bir deneyim sunar.)*
-
-Alternatif olarak, doğrudan komut satırından da verebilirsiniz:
-```bash
-sudo ./rulefucker uname --sysname "RuleOS" --nodename "god-pc" --release "99.0.1"
+sudo ./rulefucker.sh
 ```
 
-### 2. İşletim Sistemi Kimliğini Değiştirme
-`/etc/os-release` dosyasını kalıcı olarak değiştirip sisteminizin adını belirlemek için:
-```bash
-sudo ./rulefucker os --name "RuleOS" --id "ruleos"
-```
+Menüden yapabileceğiniz işlemler:
 
-### 3. Evrensel Masaüstü Ortamı (DE) Kurucu
-Rulefucker, sisteminizin paket yöneticisini (`apt`, `pacman`, `dnf` vb.) otomatik algılar ve istediğiniz ortamı anında kurar.
-```bash
-sudo ./rulefucker install hyprland
-sudo ./rulefucker install xfce
-```
+### 1. Kimlik ve Arayüz (Identity & UI)
+- **Uname Değiştirici:** Linux Çekirdeğine (Kernel) bir modül enjekte ederek hafızadaki kimliğini (Sysname, Release vb.) anında ve kalıcı ezer.
+- **OS Identity:** `/etc/os-release` dosyasını otomatik yedekler ve sisteminizi istediğiniz isimle yeniden yapılandırır.
+- **DE/WM Evrensel Kurucu:** Sisteminizi otomatik tarar (`apt`, `pacman`, `dnf` vb. hangisi kullanılıyorsa bulur) ve belirttiğiniz masaüstü ortamını (örn. Hyprland) anında kurar.
 
-## ⚙️ Teknik Altyapı
-- **LKM (Loadable Kernel Module):** `uname` sistem çağrısı değerlerini doğrudan kernel hafızasından (`init_uts_ns`) değiştirir.
-- **Python CLI:** Kurulum, yedekleme (`.bak` oluşturma) ve yapılandırmaları otomatik yönetir.
+### 2. God Mode Araçları
+- **Git Install (Otomatik Derleyici):** Sadece Github/Gitlab linkini verin. Araç depoyu klonlar, içindeki `Makefile`, `CMake`, `Cargo` veya `Autotools` altyapısını otomatik algılar, derler ve sisteme kurar.
+- **Bootloader & Init Manipülasyonu:** `/etc/default/grub` dosyasına doğrudan müdahale ederek bir sonraki başlatmada geçerli olacak `init=/bin/bash` veya `quiet` gibi kernel parametreleri ekler.
+- **MAC Adresi Yöneticisi:** Ağ kartınızın donanım adresini (MAC) saniyeler içinde gizlilik amacıyla değiştirir.
+- **Kabuk (Shell) Evrimi:** Sistemin varsayılan terminal kabuğunu (örn. `bash`'ten `zsh`'e) kalıcı olarak değiştirir.
 
 ---
 *İnsanların yükselişine bir basamak.*
