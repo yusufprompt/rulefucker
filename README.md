@@ -32,6 +32,7 @@ Menüden yapabileceğiniz işlemler:
 - **Bootloader & Init Manipülasyonu:** `/etc/default/grub` dosyasına doğrudan müdahale ederek bir sonraki başlatmada geçerli olacak `init=/bin/bash` veya `quiet` gibi kernel parametreleri ekler.
 - **MAC Adresi Yöneticisi:** Ağ kartınızın donanım adresini (MAC) saniyeler içinde gizlilik amacıyla değiştirir.
 - **Kabuk (Shell) Evrimi:** Sistemin varsayılan terminal kabuğunu (örn. `bash`'ten `zsh`'e) kalıcı olarak değiştirir.
+- **Ses Servisi Değişimi:** Sistemdeki  Kullanılan Ses Servisini (örnek pipewire) Servisini İstenilen Ses Servisi (örnek PulseAudio) Servisi olarak değiştirir.
 
 ---
 *İnsanların yükselişine bir basamak.*
