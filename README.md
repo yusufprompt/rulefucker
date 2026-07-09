@@ -1,6 +1,6 @@
 <img width="220" height="220" alt="laptop-hacking" src="https://github.com/user-attachments/assets/610d7b4f-1ff7-4729-b183-4c1caeb2b2cf" />
 
-# 🚀 Rulefucker v4.0 - Ultimate System Mutator (God Mode)
+# 🚀 Rulefucker v5.0 - Ultimate System Mutator (God Mode)
 
 **Rulefucker**, Linux sisteminizin kimliğini ve temel yapıtaşlarını **gerçekten** ve **kalıcı** olarak değiştiren (spoofing değil, mutasyon) "Tanrı Modu" özelliklerine sahip güçlü bir sistem evrim aracıdır. İnsanları kandırmaz, onların yükselişine basamak ekler!
 
@@ -12,7 +12,7 @@ GCC ve Make gereklidir
 Herhangi bir manuel derlemeye gerek yoktur, araç bağımlılıkları kendisi yönetir.
 ```bash
 cd /path/to/rulefucker
-chmod +x native_manager.py rulefucker.sh
+chmod +x rulefucker_loader.py rulefucker.sh
 ```
 
 ## 📚 Kullanım ve Özellikler
@@ -47,7 +47,7 @@ Bu Script **if** mantığı ile çalışıyor:
 
 - **İşletim Sistemi Tespit Etme**: Kullandığınız İşletim Sistemini(Arch,Fedora,Ubuntu/Debian,NixOS vb.) Algılar.
 - **Yapay Zeka Destekli Sorgulama**:
-İstediğiniz Paketı Yazdığınızda Paketi **SwoxAI** ya İletir ve Cevap Bekler. SwoxAI Cevap Verdiğinde Cevabı Kullanıcıya İletir.
+İstediğiniz Paketı Yazdığınızda Paketi **SwoxAI** ya İletir ve Cevap Bekler. SwoxAI Cevap Verdiğinde Cevabı Kullanıcıya İletir. [Daha Eklenmedi
 - **Doğrulama**:
 Paketi Kullanıcıya sorar (Paket Bu mu?<y-n>) Kullanıcı Eyer **Y** derse Paketi İşletim Sistemine göre İndirir.
 Eyer N derse Paketi Bulana Kadar sorgular Kullanıcıya sorar AI ya iletir.
