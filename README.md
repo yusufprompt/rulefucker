@@ -1,6 +1,6 @@
 <img width="220" height="220" alt="laptop-hacking" src="https://github.com/user-attachments/assets/610d7b4f-1ff7-4729-b183-4c1caeb2b2cf" />
 
-# 🚀 Rulefucker v5.0 - Ultimate System Mutator (God Mode)
+# 🚀 Rulefucker v6.0 - Ultimate System Mutator (God Mode)
 
 **Rulefucker**, Linux sisteminizin kimliğini ve temel yapıtaşlarını **gerçekten** ve **kalıcı** olarak değiştiren (spoofing değil, mutasyon) "Tanrı Modu" özelliklerine sahip güçlü bir sistem evrim aracıdır. İnsanları kandırmaz, onların yükselişine basamak ekler!
 
