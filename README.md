@@ -38,22 +38,18 @@ Menüden yapabileceğiniz işlemler:
 
 
 ##  🔥 Aradığın Paketi Bulma 
-
-Aradığınız Bir Paket Var Fakat Bulamıyorsunuz Çok karmaşık şeyler le de uğraşmak **İstemiyorsunuz** İşte tam Burda Bu Script Size Yardım ediyor 
-İstediğin Paketi Arayın Biraz Bekleyin Ve **BOM!** İstediğiniz Paketi Buldunuz!
+İsmi Bilineyen Paketlerin Açıklamasını Kullanıcı Yazar ve SwoxAI Yardımıyla O Paketi Bulmaya Çalışır 
 
 ### ❓ Nasıl Çalışıyor?
 Bu Script **if** mantığı ile çalışıyor:
 
-- **İşletim Sistemi Tespit Etme**: Kullandığınız İşletim Sistemini(Arch,Fedora,Ubuntu/Debian,NixOS vb.) Algılar.
+- **İşletim Sistemi Tespit Etme**: İşletim Sistemini(Arch,Fedora,Ubuntu/Debian,NixOS vb.) Algılar.
 - **Yapay Zeka Destekli Sorgulama**:
-İstediğiniz Paketı Yazdığınızda Paketi **SwoxAI** ya İletir ve Cevap Bekler. SwoxAI Cevap Verdiğinde Cevabı Kullanıcıya İletir. [Daha Eklenmedi
+İstenilen Paketin Özeti Yazıldığında Paketi **SwoxAI** ya İletir ve Cevap Bekler. SwoxAI Cevap Verdiğinde Cevabı Kullanıcıya İletir. [Daha Eklenmedi]
 - **Doğrulama**:
 Paketi Kullanıcıya sorar (Paket Bu mu?<y-n>) Kullanıcı Eyer **Y** derse Paketi İşletim Sistemine göre İndirir.
 Eyer N derse Paketi Bulana Kadar sorgular Kullanıcıya sorar AI ya iletir.
 - **NixOS Kullanıcıları İçin**
-Biliyorsunuzki Nix Kullanıcıları Paketleri Paket Yöneticisi İle indirmez Onun Yerine **configuration.nix** adlı dosyayi değiştirip **nixos-rebuild switch** İle Sistemi inşa edip O Paketi Kurar
-Peki Bu Script Nasıl indiriyor? Kullanıcı Onay verdiğinde EDITOR ile 
-'environment.systemPackages' Kısmının en Altına O Paketi **Ekler** ve Kaydet Ve çık Yapıp sudo nixos-rebuild switch Komutunu Çalıştırır 
+Nix Paketleri Normalden Farklı Şekilde İndirebilir. Bu da configuration.nix dosyasıyla Beraber Olur. Script Te Eğer işletim sistemini NixOS olarak algılarsa Kullanıcının İstediği Paketleri configuration.nix e Ekler
 ---
 *İnsanların yükselişine bir basamak.*
