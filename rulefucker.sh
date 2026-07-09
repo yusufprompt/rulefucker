@@ -26,17 +26,20 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- DOĞRU YOLLAR ---
 LOADER="$SCRIPT_DIR/rulefucker_loader.py"
-MODULE_SRC="$SCRIPT_DIR/rulefucker_kernel_advanced.c"
+MODULE_SRC="$SCRIPT_DIR/legacy_v2/c_hook/rulefucker_kernel_advanced.c"
+MODULE_DIR="$SCRIPT_DIR/legacy_v2/c_hook"
 
 # Gerekli dosyaların varlığını kontrol et
 if [ ! -f "$LOADER" ]; then
-    echo -e "${YELLOW}[!] rulefucker_loader.py bulunamadı. Kernel enjeksiyonu devre dışı.${NC}"
-    echo -e "${YELLOW}[!} Sadece sistem kimliği ve yardımcı araçlar kullanılabilir.${NC}"
+    echo -e "${YELLOW}[!] rulefucker_loader.py bulunamadı. Ana dizine koymayı unutmayın.${NC}"
 fi
 
 if [ ! -f "$MODULE_SRC" ]; then
-    echo -e "${YELLOW}[!] rulefucker_kernel_advanced.c bulunamadı. Kernel modül derlenemeyecek.${NC}"
+    echo -e "${YELLOW}[!] $MODULE_SRC bulunamadı.${NC}"
+    echo -e "${YELLOW}[!] Dosyayı legacy_v2/c_hook/ dizinine koyun.${NC}"
 fi
 
 #===============================================================================
@@ -92,6 +95,7 @@ check_dependencies() {
         if [ ! -d "/lib/modules/$(uname -r)/build" ] && command -v pacman &>/dev/null; then
             echo -e "${RED}[!] Dikkat: Kernel güncellenmiş fakat sistem yeniden başlatılmamış!${NC}"
             echo -e "${YELLOW}Modül derlemek için lütfen sistemi yeniden başlatın (sudo reboot).${NC}"
+            echo -e "${YELLOW}Ya da mevcut kernel ile derlemeyi dene: /lib/modules/$(uname -r)/build${NC}"
             read -p "Devam etmek için Enter'a basın (Derleme hata verebilir)..."
         fi
     fi
@@ -105,19 +109,104 @@ check_dependencies() {
 }
 
 #===============================================================================
-# KERNEL MODÜLÜ YÜKLEME/KALDIRMA
+# MANUEL DERLEME (Loader olmadan direkt)
 #===============================================================================
-run_loader() {
-    if [ ! -f "$LOADER" ]; then
-        echo -e "${RED}Hata: rulefucker_loader.py bulunamadı.${NC}"
+build_and_load_module_direct() {
+    echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"
+    echo -e "${GREEN}  MANUEL KERNEL MODÜLÜ DERLEME & YÜKLEME${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
+    echo ""
+
+    if [ ! -f "$MODULE_SRC" ]; then
+        echo -e "${RED}Hata: $MODULE_SRC bulunamadı.${NC}"
+        echo -e "${YELLOW}Dosyayı şuraya koy: $MODULE_DIR/rulefucker_kernel_advanced.c${NC}"
         return 1
     fi
-    python3 "$LOADER" "$@"
-    local status=$?
-    if [ $status -ne 0 ]; then
-        echo -e "${RED}Hata: Komut başarısız oldu (çıkış kodu: $status).${NC}"
+
+    # Parametreleri al
+    read -p "$(echo -e $CYAN"Sysname"$NC" (uname -s): " )" inp_sysname
+    inp_sysname=${inp_sysname:-RuleOS}
+    read -p "$(echo -e $CYAN"Nodename"$NC" (uname -n, boş=hostname): " )" inp_nodename
+    [ -z "$inp_nodename" ] && inp_nodename="$(hostname)"
+    read -p "$(echo -e $CYAN"Release"$NC" (uname -r): " )" inp_release
+    inp_release=${inp_release:-99.0.0-rule}
+    read -p "$(echo -e $CYAN"Version"$NC" (uname -v): " )" inp_version
+    inp_version=${inp_version:-"#1 SMP PREEMPT RuleFucker"}
+    read -p "$(echo -e $CYAN"Machine"$NC" (uname -m, boş=x86_64): " )" inp_machine
+    inp_machine=${inp_machine:-x86_64}
+    read -p "$(echo -e $CYAN"Domain"$NC" (NIS domain): " )" inp_domain
+    inp_domain=${inp_domain:-"(none)"}
+
+    echo ""
+    read -p "$(echo -e $CYAN"Modül gizli mi olsun? (E/h): " )" inp_hidden
+    local hidden_flag=""
+    [[ "$inp_hidden" =~ ^[Ee]$ ]] && hidden_flag="hidden=1"
+
+    echo ""
+    echo -e "${BLUE}[*] Parametreler:${NC}"
+    echo "  sysname=$inp_sysname  nodename=$inp_nodename"
+    echo "  release=$inp_release  version=$inp_version"
+    echo "  machine=$inp_machine  domain=$inp_domain"
+    echo "  hidden=${hidden_flag:-"0"}"
+    echo ""
+
+    read -p "Onaylıyor musun? (E/h): " confirm
+    confirm=${confirm:-E}
+    [[ ! "$confirm" =~ ^[Ee]$ ]] && { echo -e "${YELLOW}İptal.${NC}"; return; }
+
+    # Makefile'ı oluştur (eğer yoksa)
+    local makefile_path="$MODULE_DIR/Makefile"
+    if [ ! -f "$makefile_path" ]; then
+        cat > "$makefile_path" << 'MAKEEOF'
+CC = gcc
+CFLAGS = -Wall -fPIC -shared
+LDFLAGS = -ldl
+TARGET = rulefucker.so
+
+all: $(TARGET)
+
+$(TARGET): rulefucker.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+rulefucker_kernel_advanced.ko: rulefucker_kernel_advanced.c
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+
+clean:
+	rm -f $(TARGET) *.o *.ko *.mod* Module.symvers modules.order
+MAKEEOF
+        echo -e "${GREEN}[✓] Makefile oluşturuldu: $makefile_path${NC}"
     fi
-    return $status
+
+    # Derle
+    echo -e "${YELLOW}[*] Kernel modülü derleniyor...${NC}"
+    cd "$MODULE_DIR" || return
+    make rulefucker_kernel_advanced.ko 2>&1 | tail -20
+
+    local ko_path="$MODULE_DIR/rulefucker_kernel_advanced.ko"
+    if [ ! -f "$ko_path" ]; then
+        echo -e "${RED}[!] Derleme başarısız!${NC}"
+        echo -e "${YELLOW}Muhtemel sebep: Kernel headers uyumsuz veya reboot gerekli.${NC}"
+        echo -e "${YELLOW}Mevcut kernel: $(uname -r)${NC}"
+        echo -e "${YELLOW}Headers: $(pacman -Q linux-headers 2>/dev/null)${NC}"
+        cd "$SCRIPT_DIR"
+        return 1
+    fi
+    echo -e "${GREEN}[✓] Derleme başarılı: $ko_path${NC}"
+
+    # Yükle
+    echo -e "${YELLOW}[*] Modül yükleniyor...${NC}"
+    local cmd="insmod $ko_path sysname=\"$inp_sysname\" nodename=\"$inp_nodename\" release=\"$inp_release\" version=\"$inp_version\" machine=\"$inp_machine\" domain=\"$inp_domain\" $hidden_flag"
+    echo -e "${BLUE}  $cmd${NC}"
+    eval "$cmd" 2>&1
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}[✓] Modül başarıyla yüklendi!${NC}"
+        echo -e "${GREEN}[✓] uname -a: $(uname -a)${NC}"
+    else
+        echo -e "${RED}[!] Yükleme başarısız. dmesg kontrol et.${NC}"
+        dmesg | tail -5
+    fi
+
+    cd "$SCRIPT_DIR"
 }
 
 #===============================================================================
@@ -134,13 +223,9 @@ show_kernel_status() {
     echo -e "${YELLOW}uname -v:${NC}  $(uname -v)"
     echo -e "${YELLOW}uname -m:${NC}  $(uname -m)"
     
-    # Modül yüklü mü kontrol et
     if lsmod | grep -q "rulefucker_kernel_advanced"; then
         echo -e "${GREEN}[✓] Rulefucker kernel modülü: YÜKLÜ${NC}"
-        if [ -f /proc/rulefucker ]; then
-            echo -e "${YELLOW}/proc/rulefucker:${NC}"
-            cat /proc/rulefucker 2>/dev/null | sed 's/^/  /'
-        fi
+        [ -f /proc/rulefucker ] && echo -e "${YELLOW}/proc/rulefucker:${NC}" && cat /proc/rulefucker 2>/dev/null | sed 's/^/  /'
     elif lsmod | grep -q "rulefucker_kernel"; then
         echo -e "${GREEN}[✓] Rulefucker kernel modülü (legacy): YÜKLÜ${NC}"
     else
@@ -150,410 +235,28 @@ show_kernel_status() {
 }
 
 #===============================================================================
-# INTERAKTİF MENÜ FONKSİYONLARI
+# MODÜLÜ KALDIR
 #===============================================================================
-
-# 1) Gelişmiş Kernel Enjeksiyonu
-menu_kernel_inject() {
-    echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  GELİŞMİŞ KERNEL ENJEKSİYONU${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
-    echo ""
-    echo -e "${YELLOW}Not: Modül yüklendiğinde uname çıktısı anında değişir.${NC}"
-    echo -e "${YELLOW}Reboot sonrası da kalıcı olması için 'Kalıcılık' seçeneğini kullanın.${NC}"
-    echo ""
-
-    # Parametreleri al
-    read -p "$(echo -e $CYAN"Sysname"$NC" (uname -s, örn: PentestOS): " )" inp_sysname
-    inp_sysname=${inp_sysname:-PentestOS}
-
-    read -p "$(echo -e $CYAN"Nodename"$NC" (uname -n, boş=hostname): " )" inp_nodename
-    [ -z "$inp_nodename" ] && inp_nodename="$(hostname)"
-
-    read -p "$(echo -e $CYAN"Release"$NC" (uname -r, örn: 99.0.0-pentest): " )" inp_release
-    inp_release=${inp_release:-99.0.0-pentest}
-
-    read -p "$(echo -e $CYAN"Version"$NC" (uname -v, örn: #1 SMP RuleFucker): " )" inp_version
-    inp_version=${inp_version:-"#1 SMP PREEMPT RuleFucker 5.0"}
-
-    read -p "$(echo -e $CYAN"Machine"$NC" (uname -m, örn: x86_64): " )" inp_machine
-    inp_machine=${inp_machine:-x86_64}
-
-    read -p "$(echo -e $CYAN"Domain"$NC" (NIS domain, örn: (none)): " )" inp_domain
-    inp_domain=${inp_domain:-"(none)"}
-
-    echo ""
-    echo -e "${YELLOW}Stealth Mod Seçenekleri:${NC}"
-    echo "  1) Normal - Modül lsmod ile görünür"
-    echo "  2) Gizli - Modül lsmod ve sysfs'ten gizlenir"
-    read -p "Seçiminiz (1/2, varsayılan: 1): " stealth_choice
-    local hidden_flag=""
-    [ "$stealth_choice" = "2" ] && hidden_flag="--hidden"
-
-    echo ""
-    echo -e "${YELLOW}Kalıcılık:${NC}"
-    echo "  1) Sadece şimdilik (reboot sonrası kaybolur)"
-    echo "  2) Kalıcı olsun (reboot sonrası da yüklensin)"
-    read -p "Seçiminiz (1/2, varsayılan: 1): " persist_choice
-    local persist_flag=""
-    [ "$persist_choice" = "2" ] && persist_flag="--persist"
-
-    echo ""
-    echo -e "${BLUE}[*] Parametre özeti:${NC}"
-    echo "  sysname : $inp_sysname"
-    echo "  nodename: $inp_nodename"
-    echo "  release : $inp_release"
-    echo "  version : $inp_version"
-    echo "  machine : $inp_machine"
-    echo "  domain  : $inp_domain"
-    echo "  hidden  : $([ -n "$hidden_flag" ] && echo "EVET" || echo "HAYIR")"
-    echo "  persist : $([ -n "$persist_flag" ] && echo "EVET" || echo "HAYIR")"
-    echo ""
-
-    read -p "Onaylıyor musunuz? (E/h): " confirm
-    confirm=${confirm:-E}
-    if [[ "$confirm" =~ ^[Ee]$ ]]; then
-        run_loader \
-            --sysname "$inp_sysname" \
-            --nodename "$inp_nodename" \
-            --release "$inp_release" \
-            --version "$inp_version" \
-            --machine "$inp_machine" \
-            --domain "$inp_domain" \
-            $hidden_flag \
-            $persist_flag
-    else
-        echo -e "${YELLOW}İşlem iptal edildi.${NC}"
-    fi
-}
-
-# 2) Modül Kaldırma
 menu_kernel_remove() {
     echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"
     echo -e "${RED}  KERNEL MODÜLÜNÜ KALDIR${NC}"
     echo -e "${CYAN}═══════════════════════════════════════════${NC}"
     echo ""
-    echo -e "${YELLOW}Bu işlem:${NC}"
-    echo "  - Kernel modülünü kaldırır (rmmod)"
-    echo "  - Kalıcılık dosyalarını temizler (/etc/modules-load.d, /etc/modprobe.d)"
-    echo "  - NOT: uname değişiklikleri reboot'a kadar kalır"
-    echo ""
-    read -p "Devam etmek istiyor musunuz? (e/H): " confirm
+    
+    local module_name=""
+    lsmod | grep "rulefucker_kernel_advanced" &>/dev/null && module_name="rulefucker_kernel_advanced"
+    lsmod | grep "rulefucker_kernel" &>/dev/null && module_name="rulefucker_kernel"
+    
+    if [ -z "$module_name" ]; then
+        echo -e "${YELLOW}[!] Yüklü rulefucker modülü bulunamadı.${NC}"
+        return
+    fi
+    
+    echo -e "Modül: ${CYAN}$module_name${NC}"
+    read -p "Kaldırılsın mı? (e/H): " confirm
     if [[ "$confirm" =~ ^[Ee]$ ]]; then
-        run_loader --remove
-        echo -e "${GREEN}[✓] Modül kaldırma işlemi tamamlandı.${NC}"
-    else
-        echo -e "${YELLOW}İşlem iptal edildi.${NC}"
-    fi
-}
-
-# 3) OS Identity
-menu_os_identity() {
-    echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  OS KİMLİK ÖZELLEŞTİRME${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
-    echo ""
-
-    # Mevcut durumu göster
-    if [ -f /etc/os-release ]; then
-        echo -e "${YELLOW}Mevcut /etc/os-release:${NC}"
-        grep -E "^(NAME|ID|VERSION|PRETTY_NAME)=" /etc/os-release 2>/dev/null | sed 's/^/  /'
-    fi
-
-    echo ""
-    read -p "Yeni işletim sistemi adı (NAME, örn: Kali Linux): " os_name
-    os_name=${os_name:-"Kali Linux"}
-
-    read -p "Yeni ID (örn: kali): " os_id
-    os_id=${os_id:-kali}
-
-    # Yedekle
-    if [ -f /etc/os-release ]; then
-        cp /etc/os-release /etc/os-release.rulefucker.bak 2>/dev/null
-        echo -e "${GREEN}[✓] Orijinal /etc/os-release yedeklendi -> /etc/os-release.rulefucker.bak${NC}"
-    fi
-
-    cat > /etc/os-release <<-EOF
-NAME="${os_name}"
-ID=${os_id}
-VERSION="99.0"
-PRETTY_NAME="${os_name} 99.0 (Rulefucker)"
-VERSION_ID="99.0"
-ID_LIKE=""
-ANSI_COLOR="38;2;255;0;0"
-HOME_URL="https://rulefucker.local"
-SUPPORT_URL="https://rulefucker.local/support"
-BUG_REPORT_URL="https://rulefucker.local/bugs"
-EOF
-
-    echo -e "${GREEN}[✓] /etc/os-release başarıyla değiştirildi!${NC}"
-    echo -e "${YELLOW}Yeni OS kimliği:${NC}"
-    cat /etc/os-release | head -4 | sed 's/^/  /'
-}
-
-# 4) OS Identity Geri Yükle
-menu_os_restore() {
-    echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  ORİJİNAL OS KİMLİĞİNİ GERİ YÜKLE${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
-    echo ""
-
-    if [ -f /etc/os-release.rulefucker.bak ]; then
-        cp /etc/os-release.rulefucker.bak /etc/os-release
-        echo -e "${GREEN}[✓] Orijinal /etc/os-release geri yüklendi.${NC}"
-    else
-        echo -e "${RED}[!] Yedek dosyası bulunamadı: /etc/os-release.rulefucker.bak${NC}"
-    fi
-}
-
-# 5) Bootloader Manipülasyonu
-menu_bootloader() {
-    echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  BOOTLOADER & INIT MANİPÜLASYONU${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
-    echo ""
-
-    # Bootloader tespiti
-    if [ -f /etc/default/grub ]; then
-        echo -e "${GREEN}[✓] GRUB tespit edildi.${NC}"
-    elif [ -d /boot/loader ]; then
-        echo -e "${GREEN}[✓] systemd-boot tespit edildi.${NC}"
-    else
-        echo -e "${RED}[!] Bilinen bir bootloader bulunamadı.${NC}"
-        return
-    fi
-
-    echo ""
-    echo -e "${YELLOW}Ön Tanımlı Kernel Parametreleri:${NC}"
-    echo "  1) init=/bin/bash         (Tek kullanıcı modu bypass)"
-    echo "  2) quiet                  (Sessiz boot)"
-    echo "  3) single                 (Single user mode)"
-    echo "  4) 1                      (Runlevel 1 - kurtarma modu)"
-    echo "  5) systemd.unit=emergency (Acil durum shell'i)"
-    echo "  6) rd.break               (Initramfs shell)"
-    echo "  7) Kendi parametremi gireceğim"
-    echo ""
-    read -p "Seçiminiz (1-7): " boot_choice
-
-    local param=""
-    case $boot_choice in
-        1) param="init=/bin/bash" ;;
-        2) param="quiet" ;;
-        3) param="single" ;;
-        4) param="1" ;;
-        5) param="systemd.unit=emergency" ;;
-        6) param="rd.break" ;;
-        7) read -p "Kernel parametresi: " param ;;
-        *) echo -e "${RED}Geçersiz seçim.${NC}"; return ;;
-    esac
-
-    if [ -z "$param" ]; then
-        echo -e "${RED}Parametre boş. İşlem iptal.${NC}"
-        return
-    fi
-
-    # GRUB düzenleme
-    if [ -f /etc/default/grub ]; then
-        cp /etc/default/grub /etc/default/grub.rulefucker.bak 2>/dev/null
-        echo -e "${GREEN}[✓] /etc/default/grub yedeklendi.${NC}"
-
-        # Mevcut satırı al ve parametre ekle
-        local current_line=$(grep "^GRUB_CMDLINE_LINUX_DEFAULT=" /etc/default/grub)
-        if [ -n "$current_line" ]; then
-            # Tırnak içindeki mevcut parametreleri al
-            local current_params=$(echo "$current_line" | sed 's/GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/\1/')
-            local new_params="$current_params $param"
-            sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"$new_params\"|" /etc/default/grub
-        else
-            echo "GRUB_CMDLINE_LINUX_DEFAULT=\"$param\"" >> /etc/default/grub
-        fi
-
-        echo ""
-        echo -e "${YELLOW}GRUB güncelleniyor...${NC}"
-        if command -v update-grub &>/dev/null; then
-            update-grub
-        elif command -v grub-mkconfig &>/dev/null; then
-            grub-mkconfig -o /boot/grub/grub.cfg
-        else
-            echo -e "${RED}[!] GRUB config güncelleyici bulunamadı. Manuel çalıştırın.${NC}"
-        fi
-
-        echo -e "${GREEN}[✓] '$param' parametresi GRUB_CMDLINE_LINUX_DEFAULT'a eklendi.${NC}"
-        echo -e "${YELLOW}Yeni başlatmada aktif olacak.${NC}"
-    fi
-}
-
-# 6) MAC Adresi Değiştirme
-menu_mac_change() {
-    echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  MAC ADRESİ DEĞİŞTİRME${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
-    echo ""
-
-    # Ağ arayüzlerini listele
-    echo -e "${YELLOW}Mevcut ağ arayüzleri:${NC}"
-    ip -o link show | awk -F': ' '{print $2}' | sed 's/@.*//' | while read iface; do
-        mac=$(ip link show "$iface" 2>/dev/null | grep "ether" | awk '{print $2}')
-        echo "  $iface  $([ -n "$mac" ] && echo "$mac" || echo "(yok)")"
-    done
-
-    echo ""
-    read -p "Değiştirilecek arayüz: " iface
-    if [ -z "$iface" ]; then
-        echo -e "${RED}Arayüz adı gerekli.${NC}"
-        return
-    fi
-
-    # Rastgele MAC üret
-    local rand_mac=$(printf '02:%02x:%02x:%02x:%02x:%02x' $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
-    read -p "Yeni MAC (boş=rastgele $rand_mac): " new_mac
-    new_mac=${new_mac:-$rand_mac}
-
-    echo ""
-    echo -e "${YELLOW}[*] $iface kapatılıyor...${NC}"
-    ip link set dev "$iface" down 2>/dev/null || {
-        echo -e "${RED}Hata: Arayüz kapatılamadı.${NC}"
-        return
-    }
-
-    echo -e "${YELLOW}[*] MAC $new_mac olarak değiştiriliyor...${NC}"
-    ip link set dev "$iface" address "$new_mac" 2>/dev/null || {
-        echo -e "${RED}Hata: MAC değiştirilemedi.${NC}"
-        ip link set dev "$iface" up 2>/dev/null
-        return
-    }
-
-    echo -e "${YELLOW}[*] $iface açılıyor...${NC}"
-    ip link set dev "$iface" up 2>/dev/null
-
-    echo -e "${GREEN}[✓] MAC adresi başarıyla $new_mac olarak değiştirildi!${NC}"
-}
-
-# 7) Shell Değiştirme
-menu_shell_change() {
-    echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  KABUK (SHELL) DEĞİŞTİRME${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
-    echo ""
-
-    echo -e "${YELLOW}Mevcut shell'ler:${NC}"
-    cat /etc/shells 2>/dev/null | sed 's/^/  /'
-
-    echo ""
-    read -p "Kullanıcı adı (boş=root): " shell_user
-    shell_user=${shell_user:-root}
-
-    echo ""
-    echo -e "${YELLOW}Seçenekler:${NC}"
-    echo "  1) /bin/bash"
-    echo "  2) /bin/zsh"
-    echo "  3) /bin/fish"
-    echo "  4) /bin/sh"
-    echo "  5) /bin/dash"
-    echo "  6) Kendi shell yolumu gireceğim"
-    read -p "Seçiminiz (1-6): " shell_choice
-
-    local shell_path=""
-    case $shell_choice in
-        1) shell_path="/bin/bash" ;;
-        2) shell_path="/bin/zsh" ;;
-        3) shell_path="/bin/fish" ;;
-        4) shell_path="/bin/sh" ;;
-        5) shell_path="/bin/dash" ;;
-        6) read -p "Shell yolu (örn: /usr/local/bin/fish): " shell_path ;;
-        *) echo -e "${RED}Geçersiz seçim.${NC}"; return ;;
-    esac
-
-    if [ ! -f "$shell_path" ]; then
-        echo -e "${YELLOW}[!] $shell_path bulunamadı. Kurulum deneniyor...${NC}"
-        local pkg_name=$(basename "$shell_path")
-        install_package "$pkg_name" || return
-    fi
-
-    chsh -s "$shell_path" "$shell_user"
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}[✓] $shell_user kullanıcısının shell'i $shell_path olarak değiştirildi.${NC}"
-    else
-        echo -e "${RED}[!] Shell değiştirilemedi. $shell_path /etc/shells içinde olmayabilir.${NC}"
-        echo -e "${YELLOW}Önce shell'i /etc/shells dosyasına ekleyin.${NC}"
-    fi
-}
-
-# 8) Git Install
-menu_git_install() {
-    echo -e "\n${CYAN}═══════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  GIT INSTALL (OTOMATİK DERLEYİCİ)${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
-    echo ""
-
-    read -p "GitHub/GitLab repo URL'si: " repo_url
-    if [ -z "$repo_url" ]; then
-        echo -e "${RED}URL gerekli.${NC}"
-        return
-    fi
-
-    echo -e "${YELLOW}[*] Depo klonlanıyor...${NC}"
-    local build_dir="/tmp/rulefucker_build_$$"
-    rm -rf "$build_dir"
-
-    git clone "$repo_url" "$build_dir" 2>/dev/null
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Hata: Depo klonlanamadı.${NC}"
-        return
-    fi
-
-    cd "$build_dir" || return
-
-    # Derleme sistemi tespiti
-    echo -e "${YELLOW}[*] Derleme sistemi taranıyor...${NC}"
-
-    if [ -f "Cargo.toml" ]; then
-        echo -e "${GREEN}[Cargo/Rust] tespit edildi.${NC}"
-        cargo install --path .
-    elif [ -f "CMakeLists.txt" ]; then
-        echo -e "${GREEN}[CMake] tespit edildi.${NC}"
-        mkdir -p build && cd build
-        cmake .. && make -j$(nproc) && make install
-    elif [ -f "configure" ]; then
-        echo -e "${GREEN}[Autotools] tespit edildi.${NC}"
-        ./configure && make -j$(nproc) && make install
-    elif [ -f "Makefile" ] || [ -f "makefile" ]; then
-        echo -e "${GREEN}[Make] tespit edildi.${NC}"
-        make -j$(nproc) && make install
-    elif [ -f "setup.py" ]; then
-        echo -e "${GREEN}[Python] tespit edildi.${NC}"
-        python3 setup.py install
-    elif [ -f "PKGBUILD" ]; then
-        echo -e "${GREEN}[PKGBUILD/Arch] tespit edildi.${NC}"
-        makepkg -si --noconfirm
-    else
-        echo -e "${RED}Bilinen bir derleme sistemi tespit edilemedi.${NC}"
-        echo -e "${YELLOW}Depo şuraya klonlandı: $build_dir${NC}"
-        return
-    fi
-
-    echo -e "${GREEN}[✓] Kurulum tamamlandı!${NC}"
-    cd "$SCRIPT_DIR" 2>/dev/null
-    rm -rf "$build_dir" 2>/dev/null
-}
-
-# 9) Durum Göster
-menu_status() {
-    show_kernel_status
-    echo ""
-    echo -e "${YELLOW}Modül yüklü mü:${NC}"
-    if lsmod | grep -q "rulefucker"; then
-        lsmod | grep "rulefucker" | sed 's/^/  /'
-    else
-        echo "  (yok)"
-    fi
-    echo ""
-    echo -e "${YELLOW}OS Release:${NC}"
-    cat /etc/os-release 2>/dev/null | sed 's/^/  /'
-    echo ""
-    echo -e "${YELLOW}Bootloader:${NC}"
-    if [ -f /etc/default/grub ]; then
-        grep "^GRUB_CMDLINE_LINUX_DEFAULT=" /etc/default/grub | sed 's/^/  /'
+        rmmod "$module_name" 2>/dev/null
+        echo -e "${GREEN}[✓] $module_name kaldırıldı.${NC}"
     fi
 }
 
@@ -571,30 +274,33 @@ show_menu() {
 
     # Kernel durum özeti
     if lsmod | grep -q "rulefucker_kernel_advanced"; then
-        echo -e "  ${GREEN}[●] Kernel Modül: AKTİF${NC}"
+        echo -e "  ${GREEN}[●] Kernel Modül (Advanced): AKTİF${NC}"
     elif lsmod | grep -q "rulefucker_kernel"; then
         echo -e "  ${GREEN}[●] Kernel Modül (Legacy): AKTİF${NC}"
     else
         echo -e "  ${RED}[○] Kernel Modül: YÜKLÜ DEĞİL${NC}"
     fi
+    
+    # LD_PRELOAD durumu
+    if [ -n "$LD_PRELOAD" ] && echo "$LD_PRELOAD" | grep -qi "rulefucker"; then
+        echo -e "  ${GREEN}[●] LD_PRELOAD Hook: AKTİF${NC}"
+    fi
     echo ""
 
     echo -e "  ${GREEN}${BOLD}[ KERNEL & SİSTEM KİMLİĞİ ]${NC}"
-    echo "   1)  Kernel Enjeksiyonu (Gelişmiş - uname değiştir)"
-    echo "   2)  Kernel Modülünü Kaldır & Temizle"
-    echo "   3)  OS Identity (/etc/os-release değiştir)"
-    echo "   4)  OS Identity Geri Yükle"
+    echo "   1)  Kernel Enjeksiyonu (Derle + Yükle - Advanced LKM)"
+    echo "   2)  Kernel Modülünü Kaldır"
+    echo "   3)  Kernel Durumunu Göster"
     echo ""
-    echo -e "  ${GREEN}${BOLD}[ GOD MODE ARAÇLARI ]${NC}"
-    echo "   5)  Bootloader & Init Manipülasyonu"
-    echo "   6)  MAC Adresi Değiştir"
-    echo "   7)  Varsayılan Kabuğu (Shell) Değiştir"
-    echo "   8)  Git Install (Otomatik Derleyici/Kurucu)"
+    echo -e "  ${GREEN}${BOLD}[ DİĞER ARAÇLAR ]${NC}"
+    echo "   4)  OS Identity (/etc/os-release değiştir)"
+    echo "   5)  OS Identity Geri Yükle"
+    echo "   6)  Bootloader & Init Manipülasyonu"
+    echo "   7)  MAC Adresi Değiştir"
+    echo "   8)  Shell Değiştir"
+    echo "   9)  Git Install (Otomatik Derleyici)"
     echo ""
-    echo -e "  ${GREEN}${BOLD}[ DURUM & ÇIKIŞ ]${NC}"
-    echo "   9)  Sistem Durumunu Göster"
     echo "   0)  Çıkış"
-    echo ""
     echo -e "${CYAN}────────────────────────────────────────────${NC}"
 }
 
@@ -611,7 +317,7 @@ while true; do
 
     case $choice in
         1)
-            menu_kernel_inject
+            build_and_load_module_direct
             read -p "Devam etmek için Enter'a basın..."
             ;;
         2)
@@ -619,44 +325,101 @@ while true; do
             read -p "Devam etmek için Enter'a basın..."
             ;;
         3)
-            menu_os_identity
+            show_kernel_status
             read -p "Devam etmek için Enter'a basın..."
             ;;
         4)
-            menu_os_restore
+            echo -e "\n${CYAN}[ OS Identity Değiştir ]${NC}"
+            read -p "Yeni OS adı (örn: Kali Linux): " os_name
+            os_name=${os_name:-"Kali Linux"}
+            read -p "Yeni ID (örn: kali): " os_id
+            os_id=${os_id:-kali}
+            [ -f /etc/os-release ] && cp /etc/os-release /etc/os-release.rulefucker.bak 2>/dev/null
+            cat > /etc/os-release <<-EOF
+NAME="${os_name}"
+ID=${os_id}
+VERSION="99.0"
+PRETTY_NAME="${os_name} 99.0 (Rulefucker)"
+VERSION_ID="99.0"
+HOME_URL="https://rulefucker.local"
+EOF
+            echo -e "${GREEN}[✓] /etc/os-release değiştirildi${NC}"
             read -p "Devam etmek için Enter'a basın..."
             ;;
         5)
-            menu_bootloader
+            if [ -f /etc/os-release.rulefucker.bak ]; then
+                cp /etc/os-release.rulefucker.bak /etc/os-release
+                echo -e "${GREEN}[✓] Orijinal geri yüklendi${NC}"
+            else
+                echo -e "${RED}[!] Yedek bulunamadı${NC}"
+            fi
             read -p "Devam etmek için Enter'a basın..."
             ;;
         6)
-            menu_mac_change
+            echo -e "\n${CYAN}[ Bootloader Manipülasyonu ]${NC}"
+            echo "  1) init=/bin/bash"
+            echo "  2) quiet"
+            echo "  3) single"
+            echo "  4) systemd.unit=emergency"
+            echo "  5) rd.break"
+            echo "  6) Kendi parametrem"
+            read -p "Seçim (1-6): " bc
+            param=""
+            case $bc in 1) param="init=/bin/bash" ;; 2) param="quiet" ;; 3) param="single" ;; 4) param="systemd.unit=emergency" ;; 5) param="rd.break" ;; 6) read -p "Parametre: " param ;; esac
+            if [ -n "$param" ] && [ -f /etc/default/grub ]; then
+                cp /etc/default/grub /etc/default/grub.rulefucker.bak 2>/dev/null
+                current=$(grep "^GRUB_CMDLINE_LINUX_DEFAULT=" /etc/default/grub | sed 's/GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/\1/')
+                sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"$current $param\"|" /etc/default/grub
+                echo -e "${GREEN}[✓] Parametre eklendi: $param${NC}"
+                command -v update-grub &>/dev/null && update-grub
+                command -v grub-mkconfig &>/dev/null && grub-mkconfig -o /boot/grub/grub.cfg
+            fi
             read -p "Devam etmek için Enter'a basın..."
             ;;
         7)
-            menu_shell_change
+            echo -e "\n${CYAN}[ MAC Adresi Değiştir ]${NC}"
+            ip -o link show | awk -F': ' '{print $2}' | sed 's/@.*//'
+            read -p "Arayüz: " iface
+            [ -z "$iface" ] && { echo -e "${RED}Arayüz gerekli${NC}"; read -p "Enter..."; continue; }
+            rand_mac=$(printf '02:%02x:%02x:%02x:%02x:%02x' $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
+            read -p "MAC (boş=rastgele $rand_mac): " new_mac
+            new_mac=${new_mac:-$rand_mac}
+            ip link set dev "$iface" down && ip link set dev "$iface" address "$new_mac" && ip link set dev "$iface" up
+            echo -e "${GREEN}[✓] MAC değiştirildi: $new_mac${NC}"
             read -p "Devam etmek için Enter'a basın..."
             ;;
         8)
-            menu_git_install
+            echo -e "\n${CYAN}[ Shell Değiştir ]${NC}"
+            cat /etc/shells 2>/dev/null
+            read -p "Kullanıcı (boş=root): " suser
+            suser=${suser:-root}
+            read -p "Shell yolu (örn: /bin/zsh): " spath
+            [ -n "$spath" ] && chsh -s "$spath" "$suser" && echo -e "${GREEN}[✓] Shell değiştirildi${NC}"
             read -p "Devam etmek için Enter'a basın..."
             ;;
         9)
-            menu_status
+            echo -e "\n${CYAN}[ Git Install ]${NC}"
+            read -p "Repo URL: " repourl
+            if [ -n "$repourl" ]; then
+                bd="/tmp/rulefucker_build_$$"
+                git clone "$repourl" "$bd" 2>/dev/null && cd "$bd" || continue
+                [ -f Cargo.toml ] && cargo install --path .
+                [ -f CMakeLists.txt ] && { mkdir -p build && cd build && cmake .. && make -j$(nproc) && make install; cd ..; }
+                [ -f configure ] && { ./configure && make -j$(nproc) && make install; }
+                [ -f Makefile ] && make -j$(nproc) && make install
+                [ -f setup.py ] && python3 setup.py install
+                cd "$SCRIPT_DIR"
+                rm -rf "$bd"
+                echo -e "${GREEN}[✓] Kurulum tamam${NC}"
+            fi
             read -p "Devam etmek için Enter'a basın..."
             ;;
         0)
-            echo -e "${GREEN}"
-            echo "  ╔══════════════════════════════════╗"
-            echo "  ║  Görüşmek üzere Tanrı Modu       ║"
-            echo "  ║  kapatılıyor...                   ║"
-            echo "  ╚══════════════════════════════════╝"
-            echo -e "${NC}"
+            echo -e "${GREEN}Görüşmek üzere Tanrı Modu kapatılıyor...${NC}"
             exit 0
             ;;
         *)
-            echo -e "${RED}Geçersiz seçim. Lütfen 0-9 arası bir değer girin.${NC}"
+            echo -e "${RED}Geçersiz seçim.${NC}"
             sleep 2
             ;;
     esac
